@@ -35,15 +35,20 @@ The implemented features are:
 
 
 ### Get and deploy the multi-tenant service - 
-Get the middleware.
+
+Get and deploy the middleware (sample for Azure)
 ```
 git clone https://github.com/robertbreker/microapps-middleware-sample-o365.git
-```
-
-Deploy the middleware.
-```
 cd microapps-middleware-sample-o365.git
-Todo...
+# Choose an <app_name> that's uniquie across across Azure, e.g. my-microapps-middleware-sample-o365
+# In application.py, update SUBSCRIPTION_CALLBACK_URL to match your service (ToDo: there must be an environment variable to do this)
+SUBSCRIPTION_CALLBACK_URL = 'https://<app_name>.scm.azurewebsites.net/'
+# Login to Azure
+az login
+# Deploy the app on a Free Tier (Replace <app_name> with a unique name across Azure)
+az webapp up --sku F1 -n <app_name>
+# Once the command completes, you should be good to go.
+# Your app will now be running and be ready to be used at https://<app_name>.scm.azurewebsites.net/
 ```
 Note that this middleware service can be used by multiple Citrix Workspace tenants and configured integrations.
 
