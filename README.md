@@ -38,15 +38,20 @@ Get and deploy the middleware (sample for Azure)
 ```
 git clone https://github.com/robertbreker/microapps-middleware-sample-o365.git
 cd microapps-middleware-sample-o365.git
+
 # Choose an <app_name> that's uniquie across across Azure, e.g. my-microapps-middleware-sample-o365
 # In application.py, update SUBSCRIPTION_CALLBACK_URL to match your service (ToDo: there must be an environment variable to do this)
 SUBSCRIPTION_CALLBACK_URL = 'https://<app_name>.azurewebsites.net/'
+
 # Login to Azure
 az login
+
 # Deploy the app on a Free Tier (Replace <app_name> with a unique name across Azure)
 az webapp up --sku F1 -n <app_name>
-# Once the command completes, you should be good to go.
 # Your app will now be running and be ready to be used at https://<app_name>.azurewebsites.net/
+
+# configure the startup command to include multiple gunicorn workers
+az webapp config set --resource-group <your-resource-group> --name <app_name> --startup-file "gunicorn --bind=0.0.0.0 --timeout 600 application:app --workers=3"
 ```
 Note that this middleware service can be used by multiple Citrix Workspace tenants and configured integrations.
 
@@ -90,13 +95,15 @@ Import and configure the integration bundle.
 3. Select "Manage", "Add Integration", "Import a previously configured integration"
 4. Select SampleO365Middleware.service.mapp and "Import"
 5. Right click the Integration, select "Edit", in the left menu "Configuration"
-6. Configure the previously noted "Client ID", and "Client Secret"
-7. Also configure the "Client ID" and "Client Secret" for Service Action Authentication
-8. Aply the settings by click "Save" in the bottom left
-9. Select "Webhook Listeners" and copy the URLs of email\_webhook and calendar\_webhook, remembering which is which
-10. Select "Data loading" and edit the "trigger\_middleware" data endpoint
-11. Edit the query paramters to contain the calendar\_webhook and email\_webhook URLs, that you copied in step 9
-12. Subscribe users to the integration and test
+6. In the "Service Authentication" section, find "Token URL" and modify the path, replacing the string 'your\_tenant\_id' with your "Tenant ID" for your Azure Active Directory
+7. In the "Service Action Authentication" section find the "Token URL" and "Authorization URL" and modify the path, replacing 'your\_tenant\_id' with your "Tenant ID" for your Azure Active Directory
+8. Configure the previously noted "Client ID", and "Client Secret"
+9. Also configure the "Client ID" and "Client Secret" for Service Action Authentication
+10. Apply the settings by click "Save" in the bottom left
+11. Select "Webhook Listeners" and copy the URLs of email\_webhook and calendar\_webhook, remembering which is which
+12. Select "Data loading" and edit the "trigger\_middleware" data endpoint
+13. Edit the query paramters to contain the calendar\_webhook and email\_webhook URLs, that you copied previously
+14. Subscribe users to the integration and test the integration
 
 ## Design notes
 
