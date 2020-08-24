@@ -62,11 +62,6 @@ def get_data(hkey):
         return {}
 
 
-@app.route("/test_endpoint")
-def test_endpoint():
-    return Response('{"status": "test_endpoint ok"}', status=200)
-
-
 @app.route("/trigger_middleware")
 def trigger_middleware():
     """ Main entry point - gets regularly triggered by a data endpoint
