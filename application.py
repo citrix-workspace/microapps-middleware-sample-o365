@@ -19,7 +19,7 @@ app = Flask(__name__)
 
 ####
 # Basic configuration - Update the following to match your environment
-SUBSCRIPTION_CALLBACK_URL = 'https://vs.breker.name'
+SUBSCRIPTION_CALLBACK_URL = 'https://<app_name>.azurewebsites.net'
 
 ####
 # Advanced Configuration
