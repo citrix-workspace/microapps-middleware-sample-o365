@@ -51,6 +51,7 @@ az webapp up --sku F1 -n <app_name>
 # Your app will now be running and be ready to be used at https://<app_name>.azurewebsites.net/
 
 # configure the startup command to include multiple gunicorn workers
+# this is needed so that one worker process can validate webhook subscriptions while another creates them
 az webapp config set --resource-group <your-resource-group> --name <app_name> --startup-file "gunicorn --bind=0.0.0.0 --timeout 600 application:app --workers=4"
 ```
 Note that this middleware service can be used by multiple Citrix Workspace tenants and configured integrations.
