@@ -460,9 +460,7 @@ def get_headers(request):
     return {
         'Authorization': request.headers['Authorization'],
         'Accept': request.headers['Accept'],
-        'User-Agent': request.headers['User-Agent'],
-        'Accept-Encoding': request.headers['Accept-Encoding'],
-        'Content-Type': request.headers['Content-Type'],
+        'Content-Type': request.headers['Content-Type']
     }
 
 
