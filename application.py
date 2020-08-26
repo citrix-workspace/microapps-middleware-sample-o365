@@ -61,8 +61,11 @@ def get_data(hkey):
 @debugging_decorator
 @app.route("/trigger_middleware")
 def trigger_middleware():
-    """ Main entry point - gets regularly triggered by a data endpoint
-        configured in the integration. This is where the magic starts.  """
+    """
+    Main entry point - gets regularly triggered by a data endpoint
+    configured in the integration. This is where the magic starts.
+    """
+
     # We trust the webhook URLs to form a unique key
     s = (request.args['calendar_webhook']
          + request.args['email_webhook']).encode('utf-8')
@@ -84,8 +87,7 @@ def trigger_middleware():
         headers = get_headers(authorization)
         users = get_all_users(headers)
         # We pull the calendar regularly, to avoid having to cache all times,
-        # and to be able to report events planed before the webhook got
-        # configured.
+        # and to be able to report events planed before the webhook got configured.
         update_calendar(authorization, users, calendar_webhook)
         wipe_subscriptions(authorization)
         register_subscriptions(authorization, hkey, users,
@@ -104,8 +106,10 @@ def trigger_middleware():
 
 @debugging_decorator
 def wipe_subscriptions(authorization):
-    """ Wipe pre-existing event subscriptions, to start with a clean slate,
-        and to avoid being notified twice. """
+    """
+    Wipe pre-existing event subscriptions, to start with a clean slate,
+    and to avoid being notified twice.
+    """
     headers = get_headers(authorization)
     subscriptions = odata_get(f"{GRAPH_API_URL}/v1.0/subscriptions/?"
                               + "select=id,notificationUrl",
@@ -127,8 +131,9 @@ def wipe_subscriptions(authorization):
 
 @debugging_decorator
 def register_subscriptions(authorization, hkey, users, calendar_webhook, email_webhook):
-    """ Register for change events in emails (messages) and
-        calendar (events) """
+    """
+    Register for change events in emails (messages) and calendar (events)
+    """
     headers = get_headers(authorization)
     future = datetime.now()+timedelta(hours=HOURS_TO_SUBSCRIBE)
     untilstring = future.strftime("%Y-%m-%dT%H:%M:%S.0000000Z")
@@ -157,17 +162,20 @@ def register_subscriptions(authorization, hkey, users, calendar_webhook, email_w
 
 
 @debugging_decorator
-@app.route("/"+SUBSCRIPTION_CALLBACK_PATH+"/<subscription>/<hkey1>", methods=['POST'])
+@app.route(f'/{SUBSCRIPTION_CALLBACK_PATH}/<subscription>/<hkey1>', methods=['POST'])
 def handle_subscription_callback(subscription, hkey1):
-    """ This is where we get event callbacks from O365 """
+    """
+    This is where we get event callbacks from O365
+    """
+
     # Do the O365 webhook validation dance
     if 'validationToken' in request.args:
         logging.debug("Returning validationToken")
         return Response(request.args['validationToken'], status=200,
                         mimetype='text/plain; charset=utf-8')
 
-    jsonbody = json.loads(request.data)
     # More than one event can come in a single callback
+    jsonbody = json.loads(request.data)
     for value in jsonbody['value']:
         try:
             _handle_subscription_callback_value(subscription, hkey1, value)
@@ -183,17 +191,19 @@ def handle_subscription_callback(subscription, hkey1):
 
 @debugging_decorator
 def _handle_subscription_callback_value(subscription, hkey1, value):
+
     # Decode the metadata which we placed before
     client_state = value['clientState']
     (hkey0, mail, manager_mail) = client_state.split('^')
+
     # hleu is split between url and client_state - put it back together
     hkey = hkey0+hkey1
 
     try:
         globalstateentry = get_data(hkey)
     except KeyError:
-        logging.warning("Received unexpected hkey %s" %
-                        (hkey))
+        logging.warning(f"Received unexpected hkey {hkey}")
+
         # Still return to 202 to avoid O365 hitting us with the same callback
         return Response('', status=202)
 
@@ -222,8 +232,9 @@ def _handle_subscription_callback_value(subscription, hkey1, value):
 
 @debugging_decorator
 def process_message(globalstateentry, mail, manager_mail, odata_id):
-    # Handle email
-    # First of all - we need to get the real data
+    """
+    Handle email, first of all - we need to get the real data
+    """
     headers = get_headers(globalstateentry['authorization'])
     jsondata = odata_getone(f"{GRAPH_API_URL}/v1.0/{odata_id}?"
                             + "$select=id,subject,from,toRecipients,"
@@ -239,9 +250,9 @@ def process_message(globalstateentry, mail, manager_mail, odata_id):
         return
     jsondata.update({'owner': mail,
                      'is_from_manager': is_from_manager})
-    logging.debug(
-        f"Inserting email {jsondata['id']} into cache via webhook")
+
     # Todo: Workaround for unreliable pushes
+    logging.debug(f"Inserting email {jsondata['id']} into cache via webhook")
     for i in range(0, 5):
         r = requests.put(
             globalstateentry['email_webhook'], data=json.dumps(jsondata))
@@ -252,8 +263,9 @@ def process_message(globalstateentry, mail, manager_mail, odata_id):
 
 @debugging_decorator
 def process_event(globalstateentry, mail, odata_id):
-    # Handle calendar event
-    # First of all - we need to get the real data
+    """
+    Handle calendar event, first of all - we need to get the real data
+    """
     headers = get_headers(globalstateentry['authorization'])
     jsondata = odata_getone(f"{GRAPH_API_URL}/v1.0/{odata_id}?"
                             + "$select=id,subject,location,organizer,start,"
@@ -268,8 +280,10 @@ def process_event(globalstateentry, mail, odata_id):
 
 @debugging_decorator
 def update_calendar(authorization, users, calendar_webhook):
-    # Read a user's calendar, as relying on webhooks alone wouldn't reveal
-    # entries pre-existing prior to subscribing to webhooks.
+    """
+    Read a user's calendar, as relying on webhooks alone wouldn't reveal
+    entries pre-existing prior to subscribing to webhooks.
+    """
     startdatetime = datetime.now()
     startdatetime_iso = startdatetime.isoformat()
     enddatetime = startdatetime + timedelta(days=CALENDAR_DAYS_TO_CACHE)
@@ -319,11 +333,13 @@ def parse_event(event, owner, calendar_webhook):
         logging.warning(f"Failed to put to {calendar_webhook}: {r.text}")
 
 
-""" Pass-through other requests to the SoR, MS Graph """
 @debugging_decorator
 @app.route("/", defaults={"path": ""}, methods=['GET', 'POST', 'DELETE'])
 @app.route("/<path:path>", methods=['GET', 'POST', 'DELETE'])
 def pass_through(path):
+    """
+    Pass-through other requests to the SoR, MS Graph
+    """
     pathsplit = path.split('/', 1)
     if ((len(pathsplit) < 2
          or pathsplit[0] not in ['v1.0', 'beta']
@@ -364,7 +380,9 @@ def get_all_users(headers):
 
 @debugging_decorator
 def odata_get(url, headers):
-    # Get a list from odata. Follow nextLink where needed.
+    """
+    Get a list from odata. Follow nextLink where needed.
+    """
     all_values = list()
     while url:
         rjson = odata_getone(url, headers)
@@ -380,7 +398,9 @@ def odata_get(url, headers):
 
 @debugging_decorator
 def odata_getone(url, headers):
-    # Get a single object from Odata
+    """
+    Get a single object from Odata
+    """
     logging.debug(f"Fetching data from {url}")
     r = requests.get(url, headers=headers)
     if not r.ok:
