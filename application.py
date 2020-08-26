@@ -79,23 +79,24 @@ def trigger_middleware():
         next_sync = state['next_sync']
     except KeyError:
         next_sync = 0
-    authorization = request.headers.get('Authorization')
+
+    bearer_token = request.headers.get('Authorization')
     calendar_webhook = request.args.get('calendar_webhook')
     email_webhook = request.args.get('email_webhook')
     if next_sync == 0 or datetime.now() >= next_sync:
         # Need to resync
-        headers = get_headers(authorization)
+        headers = get_headers(request)
         users = get_all_users(headers)
+
         # We pull the calendar regularly, to avoid having to cache all times,
         # and to be able to report events planed before the webhook got configured.
-        update_calendar(authorization, users, calendar_webhook)
-        wipe_subscriptions(authorization)
-        register_subscriptions(authorization, hkey, users,
-                               calendar_webhook,
-                               email_webhook)
+        update_calendar(headers, users, calendar_webhook)
+        wipe_subscriptions(headers)
+        register_subscriptions(headers, hkey, users, calendar_webhook, email_webhook)
         next_sync = datetime.now()+timedelta(hours=HOURS_BETWEEN_FULLSYNC_AND_RESCUBSCRIBE)
+
     # We store the SoR bearer token, to make APi calls with it later
-    state = {'authorization': authorization,
+    state = {'authorization': bearer_token,
              'calendar_webhook': calendar_webhook,
              'email_webhook': email_webhook,
              'next_sync': next_sync}
@@ -105,12 +106,11 @@ def trigger_middleware():
 
 
 @debugging_decorator
-def wipe_subscriptions(authorization):
+def wipe_subscriptions(headers):
     """
     Wipe pre-existing event subscriptions, to start with a clean slate,
     and to avoid being notified twice.
     """
-    headers = get_headers(authorization)
     subscriptions = odata_get(f"{GRAPH_API_URL}/v1.0/subscriptions/?"
                               + "select=id,notificationUrl",
                               headers=headers)
@@ -130,11 +130,10 @@ def wipe_subscriptions(authorization):
 
 
 @debugging_decorator
-def register_subscriptions(authorization, hkey, users, calendar_webhook, email_webhook):
+def register_subscriptions(headers, hkey, users, calendar_webhook, email_webhook):
     """
     Register for change events in emails (messages) and calendar (events)
     """
-    headers = get_headers(authorization)
     future = datetime.now()+timedelta(hours=HOURS_TO_SUBSCRIBE)
     untilstring = future.strftime("%Y-%m-%dT%H:%M:%S.0000000Z")
 
@@ -235,7 +234,10 @@ def process_message(globalstateentry, mail, manager_mail, odata_id):
     """
     Handle email, first of all - we need to get the real data
     """
-    headers = get_headers(globalstateentry['authorization'])
+    headers = {
+        'Authorization': globalstateentry['authorization'],
+        'Content-type': 'application/json'
+    }
     jsondata = odata_getone(f"{GRAPH_API_URL}/v1.0/{odata_id}?"
                             + "$select=id,subject,from,toRecipients,"
                             + "importance,sentDateTime,webLink,isRead",
@@ -266,7 +268,10 @@ def process_event(globalstateentry, mail, odata_id):
     """
     Handle calendar event, first of all - we need to get the real data
     """
-    headers = get_headers(globalstateentry['authorization'])
+    headers = {
+        'Authorization': globalstateentry['authorization'],
+        'Content-type': 'application/json'
+    }
     jsondata = odata_getone(f"{GRAPH_API_URL}/v1.0/{odata_id}?"
                             + "$select=id,subject,location,organizer,start,"
                             + "end,weblink,responsestatus,body,attendees,"
@@ -279,7 +284,7 @@ def process_event(globalstateentry, mail, odata_id):
 
 
 @debugging_decorator
-def update_calendar(authorization, users, calendar_webhook):
+def update_calendar(headers, users, calendar_webhook):
     """
     Read a user's calendar, as relying on webhooks alone wouldn't reveal
     entries pre-existing prior to subscribing to webhooks.
@@ -288,7 +293,6 @@ def update_calendar(authorization, users, calendar_webhook):
     startdatetime_iso = startdatetime.isoformat()
     enddatetime = startdatetime + timedelta(days=CALENDAR_DAYS_TO_CACHE)
     enddatetime_iso = enddatetime.isoformat()
-    headers = get_headers(authorization)
     for user in users:
         events = odata_get("https://graph.microsoft.com/v1.0/"
                            + f"users/{user['id']}/calendarview?"
@@ -319,12 +323,7 @@ def parse_event(event, owner, calendar_webhook):
     # to rebuild apps for that
     meeting_link = extract_meetinglink(
         event['location']['displayName']+'^'+event['body']['content'])
-    event.update({'owner': owner,
-                  'meetingLink': meeting_link,
-                  # Workaround: Doesn't currently seem possible to delete via
-                  # webhooks, unless a single primarykey field is used
-                  #'oneprimarykey': f"{owner}^{event['id']}"}
-                 })
+    event.update({'owner': owner, 'meetingLink': meeting_link})
     logging.debug(f"Inserting event {event['id']} into cache via webhook")
     # Todo: Workaround for unreliable pushes
     for i in range(0, 5):
@@ -343,11 +342,17 @@ def pass_through(path):
     pathsplit = path.split('/', 1)
     if ((len(pathsplit) < 2
          or pathsplit[0] not in ['v1.0', 'beta']
-         or request.headers.get('Authorization') == None)):
+         or request.headers.get('Authorization') is None)):
         logging.warning(f"Ignoring unknown forwarding request for {path}")
-        return Response('', status=503)
-    r = requests.request(request.method, f'{GRAPH_API_URL}/{path}', data=request.data,
-                         params=request.args, headers=request.headers)
+        return Response('{}'.format(request.headers.get('Authorization')), status=503)
+    headers = get_headers(request)
+    r = requests.request(
+            request.method,
+            f'{GRAPH_API_URL}/{path}',
+            data=request.data,
+            params=request.args,
+            headers=headers
+        )
     if not r.ok or r.status_code < 200 or r.status_code > 299:
         logging.warning(f"Failed pass-through of {request.method} to {path} with {r.status_code} "
                         + f"due to {r.text}")
@@ -427,10 +432,18 @@ def extract_meetinglink(astring):
 
 
 @debugging_decorator
-def get_headers(authorization):
+def get_headers(request):
+    """
+    cannot use the headers of the request directly because the
+    Azure API gateway adds extra ones that invlidate forwarded requests
+    this function pics and chooses the header values that are needed
+    """
     return {
-        'Authorization': authorization,
-        'Content-type': 'application/json'
+        'Authorization': request.headers['Authorization'],
+        'Accept': request.headers['Accept'],
+        'User-Agent': request.headers['User-Agent'],
+        'Accept-Encoding': request.headers['Accept-Encoding'],
+        'Content-Type': request.headers['Content-Type'],
     }
 
 
