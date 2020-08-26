@@ -253,11 +253,9 @@ def process_message(globalstateentry, mail, manager_mail, odata_id):
     jsondata.update({'owner': mail,
                      'is_from_manager': is_from_manager})
 
-    # Todo: Workaround for unreliable pushes
     logging.debug(f"Inserting email {jsondata['id']} into cache via webhook")
-    for i in range(0, 5):
-        r = requests.put(
-            globalstateentry['email_webhook'], data=json.dumps(jsondata))
+    r = requests.put(
+        globalstateentry['email_webhook'], data=json.dumps(jsondata))
     if not r.ok:
         logging.warning(
             f"Failed to put to {globalstateentry['email_webhook']}: {r.text}")
@@ -325,9 +323,7 @@ def parse_event(event, owner, calendar_webhook):
         event['location']['displayName']+'^'+event['body']['content'])
     event.update({'owner': owner, 'meetingLink': meeting_link})
     logging.debug(f"Inserting event {event['id']} into cache via webhook")
-    # Todo: Workaround for unreliable pushes
-    for i in range(0, 5):
-        r = requests.put(calendar_webhook, data=json.dumps(event))
+    r = requests.put(calendar_webhook, data=json.dumps(event))
     if not r.ok:
         logging.warning(f"Failed to put to {calendar_webhook}: {r.text}")
 
