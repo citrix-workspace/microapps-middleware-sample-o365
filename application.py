@@ -11,7 +11,6 @@ import re
 import sys
 import pickle
 import fcntl
-import time
 
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
@@ -53,29 +52,36 @@ def store_data(hkey, state):
     data = {}
     try:
         with open(GLOBAL_STATE_PATH, 'rb+') as gs_file:
+            fcntl.flock(gs_file, fcntl.LOCK_SH)
             data = pickle.load(gs_file)
+            fcntl.flock(gs_file, fcntl.LOCK_UN)
             data[hkey] = state
     except (FileNotFoundError, IOError):
         data[hkey] = state
-    while True:
-        try:
-            with open(GLOBAL_STATE_PATH, 'wb') as gs_file:
-                fcntl.flock(gs_file, fcntl.LOCK_EX)
-                pickle.dump(data, gs_file)
-                fcntl.flock(gs_file, fcntl.LOCK_UN)
-                break
-        except IOError:
-            time.sleep(0.05)
+
+    try:
+        with open(GLOBAL_STATE_PATH, 'wb') as gs_file:
+            fcntl.flock(gs_file, fcntl.LOCK_EX)
+            pickle.dump(data, gs_file)
+            fcntl.flock(gs_file, fcntl.LOCK_UN)
+    except IOError as e:
+        raise MiddlewareException(f"Failed to store MA client state: {e}")
 
 
 @debugging_decorator
 def get_data(hkey):
     try:
         with open(GLOBAL_STATE_PATH, 'rb') as gs_file:
+            fcntl.flock(gs_file, fcntl.LOCK_SH)
             data = pickle.load(gs_file)
+            fcntl.flock(gs_file, fcntl.LOCK_UN)
             return data[hkey]
-    except (FileNotFoundError, KeyError) as e:
+    except KeyError as e:
         raise e
+    except FileNotFoundError:
+        return {}
+    except IOError as e:
+        raise MiddlewareException(f"Failed to open MA client state: {e}")
 
 
 @debugging_decorator
@@ -96,11 +102,12 @@ def trigger_middleware():
     hkey = [_hkey[0:32], _hkey[32:]]
 
     # Check whether it's time for a sync
+    next_sync = 0
     try:
         state = get_data(_hkey)
         next_sync = state['next_sync']
-    except (FileNotFoundError, KeyError):
-        next_sync = 0
+    except KeyError:
+        logging.warning(f"Received unexpected hkey {hkey}")
 
     bearer_token = request.headers.get('Authorization')
     calendar_webhook = request.args.get('calendar_webhook')
@@ -223,7 +230,10 @@ def _handle_subscription_callback_value(subscription, hkey1, value):
 
     try:
         globalstateentry = get_data(hkey)
-    except (FileNotFoundError, KeyError):
+        if not any(globalstateentry):
+            raise MiddlewareException(f"{GLOBAL_STATE_PATH} is empty "
+                                      + "at point of receiving webhook callback")
+    except KeyError:
         logging.warning(f"Received unexpected hkey {hkey}")
 
         # Still return to 202 to avoid O365 hitting us with the same callback
