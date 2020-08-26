@@ -163,10 +163,6 @@ def register_subscriptions(headers, hkey, users, calendar_webhook, email_webhook
         if user['mail'] is None:
             continue
         for subscription in ['messages', 'events']:
-            if user['manager_mail'] is None:
-                client_state = hkey[0] + "^" + user['mail'] + "^None"
-            else:
-                client_state = hkey[0] + "^" + user['mail'] + "^" + user['manager_mail']
             data = {
                 "changeType": "created,updated,deleted",
                 "notificationUrl": (SUBSCRIPTION_CALLBACK_URL + "/" +
@@ -176,7 +172,7 @@ def register_subscriptions(headers, hkey, users, calendar_webhook, email_webhook
                 "expirationDateTime": untilstring,
                 # Store some metadata in the clientState, to be able to
                 # asociate the request later.
-                "clientState": client_state
+                "clientState": (hkey[0] + "^" + user['mail'] + "^" + user['manager_mail'])
             }
             r = requests.post(f"{GRAPH_API_URL}/v1.0/subscriptions",
                               headers=headers, data=json.dumps(data))
