@@ -39,16 +39,26 @@ class MiddlewareException(Exception):
         logging.error(msg)
 
 
+def debugging_decorator(func):
+    def wrapper(*args, **kwargs):
+        logging.debug("starting " + func.__name__)
+        return func(*args, **kwargs)
+    return wrapper
+
+
+@debugging_decorator
 def store_data(hkey, state):
     global globalstate
     # ToDo: need to wipe old entries on some point, as it will eventually run out of memory
     globalstate[hkey] = state
 
 
+@debugging_decorator
 def get_data(hkey):
     return globalstate[hkey]
 
 
+@debugging_decorator
 @app.route("/trigger_middleware")
 def trigger_middleware():
     """ Main entry point - gets regularly triggered by a data endpoint
@@ -92,6 +102,7 @@ def trigger_middleware():
     return Response('{"status": "ok"}', status=200)
 
 
+@debugging_decorator
 def wipe_subscriptions(authorization):
     """ Wipe pre-existing event subscriptions, to start with a clean slate,
         and to avoid being notified twice. """
@@ -114,6 +125,7 @@ def wipe_subscriptions(authorization):
                                       + f"{r.status_code}")
 
 
+@debugging_decorator
 def register_subscriptions(authorization, hkey, users, calendar_webhook, email_webhook):
     """ Register for change events in emails (messages) and
         calendar (events) """
@@ -144,6 +156,7 @@ def register_subscriptions(authorization, hkey, users, calendar_webhook, email_w
                 logging.debug(f"Subscribed {user['mail']} to {subscription}")
 
 
+@debugging_decorator
 @app.route("/"+SUBSCRIPTION_CALLBACK_PATH+"/<subscription>/<hkey1>", methods=['POST'])
 def handle_subscription_callback(subscription, hkey1):
     """ This is where we get event callbacks from O365 """
@@ -168,6 +181,7 @@ def handle_subscription_callback(subscription, hkey1):
     return Response('', status=202)
 
 
+@debugging_decorator
 def _handle_subscription_callback_value(subscription, hkey1, value):
     # Decode the metadata which we placed before
     client_state = value['clientState']
@@ -206,6 +220,7 @@ def _handle_subscription_callback_value(subscription, hkey1, value):
         raise MiddlewareException("Unknown subscription type")
 
 
+@debugging_decorator
 def process_message(globalstateentry, mail, manager_mail, odata_id):
     # Handle email
     # First of all - we need to get the real data
@@ -235,6 +250,7 @@ def process_message(globalstateentry, mail, manager_mail, odata_id):
             f"Failed to put to {globalstateentry['email_webhook']}: {r.text}")
 
 
+@debugging_decorator
 def process_event(globalstateentry, mail, odata_id):
     # Handle calendar event
     # First of all - we need to get the real data
@@ -250,6 +266,7 @@ def process_event(globalstateentry, mail, odata_id):
     parse_event(jsondata, mail, globalstateentry['calendar_webhook'])
 
 
+@debugging_decorator
 def update_calendar(authorization, users, calendar_webhook):
     # Read a user's calendar, as relying on webhooks alone wouldn't reveal
     # entries pre-existing prior to subscribing to webhooks.
@@ -275,6 +292,7 @@ def update_calendar(authorization, users, calendar_webhook):
             parse_event(event, user['mail'], calendar_webhook)
 
 
+@debugging_decorator
 def parse_event(event, owner, calendar_webhook):
     # Filter the data, to avoid spaming the cache
     eventdt = datetime.strptime(event['start']['dateTime'].split('.', 1)[0],
@@ -302,6 +320,7 @@ def parse_event(event, owner, calendar_webhook):
 
 
 """ Pass-through other requests to the SoR, MS Graph """
+@debugging_decorator
 @app.route("/", defaults={"path": ""}, methods=['GET', 'POST', 'DELETE'])
 @app.route("/<path:path>", methods=['GET', 'POST', 'DELETE'])
 def pass_through(path):
@@ -323,6 +342,7 @@ def pass_through(path):
 ###################
 
 
+@debugging_decorator
 def get_all_users(headers):
     users = odata_get(f"{GRAPH_API_URL}/v1.0/users",
                       headers=headers)
@@ -342,6 +362,7 @@ def get_all_users(headers):
     return users
 
 
+@debugging_decorator
 def odata_get(url, headers):
     # Get a list from odata. Follow nextLink where needed.
     all_values = list()
@@ -357,6 +378,7 @@ def odata_get(url, headers):
     return all_values
 
 
+@debugging_decorator
 def odata_getone(url, headers):
     # Get a single object from Odata
     logging.debug(f"Fetching data from {url}")
@@ -371,6 +393,7 @@ def odata_getone(url, headers):
     return rjson
 
 
+@debugging_decorator
 def extract_meetinglink(astring):
     meetinglink = None
     urls = re.findall(r'(https://\S+)', astring)
@@ -383,6 +406,7 @@ def extract_meetinglink(astring):
     return meetinglink
 
 
+@debugging_decorator
 def get_headers(authorization):
     return {
         'Authorization': authorization,
