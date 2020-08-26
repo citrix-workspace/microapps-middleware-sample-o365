@@ -331,7 +331,7 @@ def update_calendar(headers, users, calendar_webhook):
         if events is None:
             logging.error("Failed to get events user user {user['id']}")
             continue
-        logging.warning('Got %d events' % (len(events)))
+        logging.debug('Got %d events' % (len(events)))
         for event in events:
             parse_event(event, user['mail'], calendar_webhook)
 
@@ -430,7 +430,6 @@ def odata_getone(url, headers):
     """
     Get a single object from Odata
     """
-    logging.debug(f"Fetching data from {url}")
     r = requests.get(url, headers=headers)
     if not r.ok:
         logging.warning(f"Fetch url {url} hit {r.status_code}")
