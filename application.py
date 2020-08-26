@@ -9,6 +9,10 @@ import requests
 import logging
 import re
 import sys
+import pickle
+import fcntl
+import time
+
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
 app = Flask(__name__)
@@ -21,16 +25,13 @@ SUBSCRIPTION_CALLBACK_URL = 'https://vs.breker.name'
 # Advanced Configuration
 SUBSCRIPTION_CALLBACK_PATH = 'handle_subscription_callback'
 GRAPH_API_URL = 'https://graph.microsoft.com'
+GLOBAL_STATE_PATH = 'globalstate.pkl'
 # Resubscribe and do a full calendar sync every 23h
 HOURS_BETWEEN_FULLSYNC_AND_RESCUBSCRIBE = 23
 # Make subscriptions last for 24h
 HOURS_TO_SUBSCRIBE = 24
 # Get upto the next 8 days, so we always have 7 days in the cache
 CALENDAR_DAYS_TO_CACHE = 8
-
-
-# ToDo: store in redis or a credential wallet.
-globalstate = {}
 
 
 class MiddlewareException(Exception):
@@ -48,14 +49,33 @@ def debugging_decorator(func):
 
 @debugging_decorator
 def store_data(hkey, state):
-    global globalstate
     # ToDo: need to wipe old entries on some point, as it will eventually run out of memory
-    globalstate[hkey] = state
+    data = {}
+    try:
+        with open(GLOBAL_STATE_PATH, 'rb+') as gs_file:
+            data = pickle.load(gs_file)
+            data[hkey] = state
+    except (FileNotFoundError, IOError):
+        data[hkey] = state
+    while True:
+        try:
+            with open(GLOBAL_STATE_PATH, 'wb') as gs_file:
+                fcntl.flock(gs_file, fcntl.LOCK_EX)
+                pickle.dump(data, gs_file)
+                fcntl.flock(gs_file, fcntl.LOCK_UN)
+                break
+        except IOError:
+            time.sleep(0.05)
 
 
 @debugging_decorator
 def get_data(hkey):
-    return globalstate[hkey]
+    try:
+        with open(GLOBAL_STATE_PATH, 'rb') as gs_file:
+            data = pickle.load(gs_file)
+            return data[hkey]
+    except (FileNotFoundError, KeyError) as e:
+        raise e
 
 
 @debugging_decorator
@@ -79,7 +99,7 @@ def trigger_middleware():
     try:
         state = get_data(_hkey)
         next_sync = state['next_sync']
-    except KeyError:
+    except (FileNotFoundError, KeyError):
         next_sync = 0
 
     bearer_token = request.headers.get('Authorization')
@@ -202,7 +222,7 @@ def _handle_subscription_callback_value(subscription, hkey1, value):
 
     try:
         globalstateentry = get_data(hkey)
-    except KeyError:
+    except (FileNotFoundError, KeyError):
         logging.warning(f"Received unexpected hkey {hkey}")
 
         # Still return to 202 to avoid O365 hitting us with the same callback
