@@ -20,7 +20,7 @@ SUBSCRIPTION_CALLBACK_URL = 'https://vs.breker.name'
 ####
 # Advanced Configuration
 SUBSCRIPTION_CALLBACK_PATH = 'handle_subscription_callback'
-GRAPH_API_URL = 'https://graph.microsoft.com/'
+GRAPH_API_URL = 'https://graph.microsoft.com'
 # Resubscribe and do a full calendar sync every 23h
 HOURS_BETWEEN_FULLSYNC_AND_RESCUBSCRIBE = 23
 # Make subscriptions last for 24h
@@ -70,9 +70,11 @@ def trigger_middleware():
     s = (request.args['calendar_webhook']
          + request.args['email_webhook']).encode('utf-8')
     _hkey = hashlib.sha512(s).hexdigest()
+
     # We split the hkey, so it's not completely contained in the url, that may get logged
     # Yet, we can't put it all into the clientstate, as the SoR restrict the clientstate length.
     hkey = [_hkey[0:32], _hkey[32:]]
+
     # Check whether it's time for a sync
     try:
         state = get_data(_hkey)
@@ -144,7 +146,7 @@ def register_subscriptions(headers, hkey, users, calendar_webhook, email_webhook
                 "notificationUrl": (SUBSCRIPTION_CALLBACK_URL + "/" +
                                     SUBSCRIPTION_CALLBACK_PATH + "/" +
                                     subscription + "/" + hkey[1]),
-                "resource": f"/users/{user['id']}/{subscription}/",
+                "resource": f"/users/{user['id']}/{subscription}",
                 "expirationDateTime": untilstring,
                 # Store some metadata in the clientState, to be able to
                 # asociate the request later.
@@ -246,7 +248,8 @@ def process_message(globalstateentry, mail, manager_mail, odata_id):
         raise MiddlewareException(
             f"Failed to resolve message in process_message {odata_id}")
     is_from_manager = (
-        manager_mail == jsondata['from']['emailAddress']['address'].lower())
+        manager_mail == jsondata['from']['emailAddress']['address'])
+
     # Filter the data to avoid spaming the cache
     if not is_from_manager and jsondata['importance'] != 'high':
         return
