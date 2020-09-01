@@ -279,7 +279,7 @@ def process_message(globalstateentry, mail, manager_mail, odata_id):
         raise MiddlewareException(
             f"Failed to resolve message in process_message {odata_id}")
     is_from_manager = (
-        manager_mail == jsondata['from']['emailAddress']['address'])
+        manager_mail == jsondata['from']['emailAddress']['address'].lower())
 
     # Filter the data to avoid spaming the cache
     if not is_from_manager and jsondata['importance'] != 'high':
