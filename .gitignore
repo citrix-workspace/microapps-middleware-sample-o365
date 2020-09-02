@@ -127,3 +127,7 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# globalstate file holds sensitive data including bearer
+# tokens for MS Azure resources, do not commit to repo
+globalstate.pkl
