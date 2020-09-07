@@ -82,6 +82,7 @@ Configure the API permissions for the new app client.
     1. Tick Calendars.ReadWrite
     2. Tick Mail.Send
 4. Select Add permissions to complete the operations
+5. Select "Grant admin consent" to activate all of the permissions
  
  Configure the app client authentication.
 1. Select "Authentication" from the left menu
@@ -96,15 +97,16 @@ Import and configure the integration bundle.
 3. Select "Manage", "Add Integration", "Import a previously configured integration"
 4. Select SampleO365Middleware.service.mapp and "Import"
 5. Right click the Integration, select "Edit", in the left menu "Configuration"
-6. In the "Service Authentication" section, find "Token URL" and modify the path, replacing the string 'your\_tenant\_id' with your "Tenant ID" for your Azure Active Directory
-7. In the "Service Action Authentication" section find the "Token URL" and "Authorization URL" and modify the path, replacing 'your\_tenant\_id' with your "Tenant ID" for your Azure Active Directory
-8. Configure the previously noted "Client ID", and "Client Secret"
-9. Also configure the "Client ID" and "Client Secret" for Service Action Authentication
-10. Apply the settings by click "Save" in the bottom left
-11. Select "Webhook Listeners" and copy the URLs of email\_webhook and calendar\_webhook, remembering which is which
-12. Select "Data loading" and edit the "trigger\_middleware" data endpoint
-13. Edit the query paramters to contain the calendar\_webhook and email\_webhook URLs, that you copied previously
-14. Subscribe users to the integration and test the integration
+6. In the "Base URL", replace 'app-name' with your azure webapp name
+7. In the "Service Authentication" section, find "Token URL" and modify the path, replacing the string 'your\_tenant\_id' with your "Tenant ID" for your Azure Active Directory
+8. In the "Service Action Authentication" section find the "Token URL" and "Authorization URL" and modify the path, replacing 'your\_tenant\_id' with your "Tenant ID" for your Azure Active Directory
+9. Configure the previously noted "Client ID", and "Client Secret"
+10. Also configure the "Client ID" and "Client Secret" for Service Action Authentication
+11. Apply the settings by click "Save" in the bottom left
+12. Select "Webhook Listeners" and copy the URLs of email\_webhook and calendar\_webhook, remembering which is which
+13. Select "Data loading" and edit the "trigger\_middleware" data endpoint
+14. Edit the query paramters to contain the calendar\_webhook and email\_webhook URLs, that you copied previously
+15. Subscribe users to the integration and test the integration
 
 ## Design notes
 
