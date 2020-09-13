@@ -24,6 +24,11 @@ The implemented features are:
 - Multi-tenant middleware service, built using Flask, that scales to being used by
   many Workspace and O365 environments.
 
+Screenshots of the Microapps:
+| <b>Standalone Actions</b><br> <img width="50%" alt="actions" src="https://user-images.githubusercontent.com/4073077/93028702-6e137c80-f60d-11ea-8e22-48f5628532d0.png"> | Send Email <br> <img width="50%" alt="send_email" src="https://user-images.githubusercontent.com/4073077/93028705-710e6d00-f60d-11ea-8657-96e22dd8c02c.png"> |
+|:-:|:-:|
+| <b>View Calendar</b> <br> <img width="50%" alt="view_calendar" src="https://user-images.githubusercontent.com/4073077/93028981-a87e1900-f60f-11ea-93f1-ed38b48005e6.png"> | <b>View calendar event</b> <br> <img width="50%" alt="view_calendar_event" src="https://user-images.githubusercontent.com/4073077/93029080-7ae59f80-f610-11ea-895c-e99e4dd88267.png"> |
+
 ## Getting Started
 
 ### Prerequisites
